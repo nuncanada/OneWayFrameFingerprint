@@ -21,7 +21,7 @@ import System.IO
 
 import System.Clock as SC
 
-type HandlerFunc = SockAddr -> B.ByteString -> IO ()
+type HandlerFunc = SockAddr -> B.ByteString -> String -> IO ()
 
 main :: IO ()
 main = do
@@ -44,6 +44,7 @@ serveLog :: String              -- ^ Port number or name; 514 is default
 serveLog port handlerfunc = withSocketsDo $
     do -- Look up the port.  Either raises an exception or returns
        -- a nonempty list.
+       hostname <- NH.getHostName
        addrinfos <- getAddrInfo
                     (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
                     Nothing (Just port)
@@ -56,21 +57,19 @@ serveLog port handlerfunc = withSocketsDo $
        bind sock (addrAddress serveraddr)
 
        -- Loop forever processing incoming data.  Ctrl-C to abort.
-       procMessages sock
-    where procMessages sock =
+       procMessages sock hostname
+    where procMessages sock hostname =
               do -- Receive one UDP packet, maximum length 1024 bytes,
                  -- and save its content into msg and its source
                  -- IP and port into addr
                  (msg, addr) <- ByteStringSocket.recvFrom sock 1024
                  -- Handle it
-                 handlerfunc addr msg
+                 handlerfunc addr msg hostname
                  -- And process more messages
-                 procMessages sock
+                 procMessages sock hostname
 
 -- A simple handler that prints incoming packets
 plainHandler :: HandlerFunc
-plainHandler (SockAddrInet port addr) msg = putStrLn $ "From " ++ show addr ++ ": " ++ (C.unpack msg)
-plainHandler addr msg =
-    do hostname <- NH.getHostName
-       currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
+plainHandler addr msg hostname =
+    do currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
        putStrLn $ hostname ++ "," ++ (showTimeSpec currentTime) ++ "," ++ (C.unpack msg)
