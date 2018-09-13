@@ -2,6 +2,8 @@
 
 module Server (main) where
 
+import Common
+
 import Data.Bits
 import Data.List
 import qualified Data.ByteString as B
@@ -11,10 +13,30 @@ import Network.Socket
 import Network.Socket.ByteString as ByteStringSocket
 import Network.HostName as NH
 
+import Control.Concurrent
+import Control.Monad
+import System.Exit
+import Data.Char (toLower)
+import System.IO
+
+import System.Clock as SC
+
 type HandlerFunc = SockAddr -> B.ByteString -> IO ()
 
 main :: IO ()
-main = serveLog "1905" plainHandler
+main = do
+    forkIO realMain
+    exitOnQ
+
+exitOnQ :: IO ()
+exitOnQ = do
+    hSetBuffering stdin NoBuffering
+    c <- getChar
+    when (toLower c /= 'q') exitOnQ
+    exitSuccess  -- or "exitWith" and some ExitCode value, use hoogle.
+
+realMain :: IO ()
+realMain = serveLog "1905" plainHandler
 
 serveLog :: String              -- ^ Port number or name; 514 is default
          -> HandlerFunc         -- ^ Function to handle incoming messages
@@ -47,6 +69,8 @@ serveLog port handlerfunc = withSocketsDo $
 
 -- A simple handler that prints incoming packets
 plainHandler :: HandlerFunc
+plainHandler (SockAddrInet port addr) msg = putStrLn $ "From " ++ show addr ++ ": " ++ (C.unpack msg)
 plainHandler addr msg =
-    putStrLn $ "From " ++ show addr ++ ": " ++ (C.unpack msg)
-{-- /snippet all --}
+    do hostname <- NH.getHostName
+       currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
+       putStrLn $ hostname ++ "," ++ (showTimeSpec currentTime) ++ "," ++ (C.unpack msg)
