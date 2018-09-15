@@ -35,13 +35,13 @@ main' :: String -> IO ()
 main' hostname =
   do
     h <- openlog hostname "1905"
-    sendTimeLoop h
+    sendTimeLoop h 0
     closelog h
 
-sendTimeLoop h = do
+sendTimeLoop h index = do
   threadDelay (100 * 1000)
-  sendTime h
-  sendTimeLoop h
+  sendTime h index
+  sendTimeLoop h (index+1)
 
 openlog :: HostName             -- ^ Remote hostname, or localhost
         -> String               -- ^ Port number or name; 514 is default
@@ -59,8 +59,8 @@ openlog hostname port =
        -- Save off the socket, and server address in a handle
        return $ SyslogHandle sock (addrAddress serveraddr)
 
-sendTime :: SyslogHandle -> IO ()
-sendTime syslogh =
+sendTime :: SyslogHandle -> Integer -> IO ()
+sendTime syslogh index =
     sendstr' sendmsg
     where sendmsg = do hostname <- NH.getHostName
 #ifdef mingw32_HOST_OS
@@ -68,7 +68,7 @@ sendTime syslogh =
 #else
                        currentTime <- getTime MonotonicRaw -- FIXME: Change to MonotonicRaw on Linux
 #endif
-                       return $ hostname ++ "," ++ (showTimeSpec currentTime)
+                       return $ (show index) ++ "," ++ hostname ++ "," ++ (showTimeSpec currentTime)
           -- Send until everything is done
           sendstr' :: IO String -> IO ()
           sendstr' msg = do omsg <- msg

@@ -21,6 +21,7 @@ import Data.Char (toLower)
 import System.IO
 
 import System.Clock as SC
+import Data.Time.Clock
 
 type HandlerFunc = SockAddr -> B.ByteString -> String -> IO ()
 
@@ -74,8 +75,9 @@ plainHandler :: HandlerFunc
 plainHandler addr msg hostname =
     do
 #ifdef mingw32_HOST_OS
-      currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
+      monotonicTimeCounter <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
 #else
-      currentTime <- getTime MonotonicRaw -- FIXME: Change to MonotonicRaw on Linux
+      monotonicTimeCounter <- getTime MonotonicRaw -- FIXME: Change to MonotonicRaw on Linux
 #endif
-      putStrLn $ hostname ++ "," ++ (showTimeSpec currentTime) ++ "," ++ (C.unpack msg)
+      currentTime <- getCurrentTime
+      putStrLn $ (show currentTime) ++ "," ++ hostname ++ "," ++ (showTimeSpec monotonicTimeCounter) ++ "," ++ (C.unpack msg)

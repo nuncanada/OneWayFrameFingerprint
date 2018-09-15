@@ -77,6 +77,17 @@
   (major1) == 0 && (major2) == 7 && (minor) <= 2)
 #endif /* MIN_VERSION_clock */
 
+/* package time-1.8.0.2 */
+#ifndef VERSION_time
+#define VERSION_time "1.8.0.2"
+#endif /* VERSION_time */
+#ifndef MIN_VERSION_time
+#define MIN_VERSION_time(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  8 || \
+  (major1) == 1 && (major2) == 8 && (minor) <= 0)
+#endif /* MIN_VERSION_time */
+
 /* package OneWayFrameFingerprint-0.1.0.0 */
 #ifndef VERSION_OneWayFrameFingerprint
 #define VERSION_OneWayFrameFingerprint "0.1.0.0"
