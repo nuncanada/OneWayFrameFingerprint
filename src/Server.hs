@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 module Server (main) where
 
@@ -71,5 +72,10 @@ serveLog port handlerfunc = withSocketsDo $
 -- A simple handler that prints incoming packets
 plainHandler :: HandlerFunc
 plainHandler addr msg hostname =
-    do currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
-       putStrLn $ hostname ++ "," ++ (showTimeSpec currentTime) ++ "," ++ (C.unpack msg)
+    do
+#ifdef mingw32_HOST_OS
+      currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
+#else
+      currentTime <- getTime MonotonicRaw -- FIXME: Change to MonotonicRaw on Linux
+#endif
+      putStrLn $ hostname ++ "," ++ (showTimeSpec currentTime) ++ "," ++ (C.unpack msg)

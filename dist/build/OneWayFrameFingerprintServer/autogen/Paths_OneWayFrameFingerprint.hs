@@ -30,10 +30,10 @@ version = Version [0,1,0,0] []
 bindir, libdir, dynlibdir, datadir, libexecdir, sysconfdir :: FilePath
 
 bindir     = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\bin"
-libdir     = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\x86_64-windows-ghc-8.4.3\\OneWayFrameFingerprint-0.1.0.0-1sfQ6uJijjEiDA3tz2Zqi"
+libdir     = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\x86_64-windows-ghc-8.4.3\\OneWayFrameFingerprint-0.1.0.0-1sfQ6uJijjEiDA3tz2Zqi-OneWayFrameFingerprintServer"
 dynlibdir  = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\x86_64-windows-ghc-8.4.3"
 datadir    = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\x86_64-windows-ghc-8.4.3\\OneWayFrameFingerprint-0.1.0.0"
-libexecdir = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\OneWayFrameFingerprint-0.1.0.0-1sfQ6uJijjEiDA3tz2Zqi\\x86_64-windows-ghc-8.4.3\\OneWayFrameFingerprint-0.1.0.0"
+libexecdir = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\OneWayFrameFingerprint-0.1.0.0-1sfQ6uJijjEiDA3tz2Zqi-OneWayFrameFingerprintServer\\x86_64-windows-ghc-8.4.3\\OneWayFrameFingerprint-0.1.0.0"
 sysconfdir = "C:\\Users\\flavi\\AppData\\Roaming\\cabal\\etc"
 
 getBinDir, getLibDir, getDynLibDir, getDataDir, getLibexecDir, getSysconfDir :: IO FilePath

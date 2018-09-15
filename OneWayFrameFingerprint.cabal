@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs: lib
   exposed-modules: Common
-  build-depends: base >=4.11 && <4.12,
+  build-depends: base >=4.9 && <4.12,
                  clock >= 0.7,
                  formatting >= 6.3
   ghc-options: -Wall -Wno-redundant-constraints
@@ -28,7 +28,7 @@ executable OneWayFrameFingerprintClient
   main-is:             Client.hs
   hs-source-dirs:      src/
   ghc-options:         -O2 -threaded -with-rtsopts=-N -main-is Client
-  build-depends:       base >=4.11 && <4.12,
+  build-depends:       base >=4.9 && <4.12,
                        network >= 2.6,
                        network-info >= 0.2,
                        hostname >= 1.0,
@@ -41,7 +41,7 @@ executable OneWayFrameFingerprintServer
   main-is:             Server.hs
   hs-source-dirs:      src/
   ghc-options:         -O2 -threaded -with-rtsopts=-N -main-is Server
-  build-depends:       base >=4.11 && <4.12,
+  build-depends:       base >=4.9 && <4.12,
                        network >= 2.6,
                        network-info >= 0.2,
                        hostname >= 1.0,

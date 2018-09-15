@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 module Client (main) where
 
@@ -16,6 +17,9 @@ import System.Clock as SC
 
 import Control.Concurrent
 
+import System.Environment
+import System.Exit
+
 data SyslogHandle =
     SyslogHandle {slSocket :: Socket,
                   slAddress :: SockAddr}
@@ -23,12 +27,19 @@ data SyslogHandle =
 main :: IO ()
 main =
   do
-    h <- openlog "localhost" "1905"
+    args <- getArgs
+    let hostname = args !! 0
+    main' hostname
+
+main' :: String -> IO ()
+main' hostname =
+  do
+    h <- openlog hostname "1905"
     sendTimeLoop h
     closelog h
 
 sendTimeLoop h = do
-  threadDelay 100000
+  threadDelay (100 * 1000)
   sendTime h
   sendTimeLoop h
 
@@ -52,7 +63,11 @@ sendTime :: SyslogHandle -> IO ()
 sendTime syslogh =
     sendstr' sendmsg
     where sendmsg = do hostname <- NH.getHostName
+#ifdef mingw32_HOST_OS
                        currentTime <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
+#else
+                       currentTime <- getTime MonotonicRaw -- FIXME: Change to MonotonicRaw on Linux
+#endif
                        return $ hostname ++ "," ++ (showTimeSpec currentTime)
           -- Send until everything is done
           sendstr' :: IO String -> IO ()
