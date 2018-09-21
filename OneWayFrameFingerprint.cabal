@@ -15,7 +15,7 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
-library Common
+library
   hs-source-dirs: lib
   exposed-modules: Common
   build-depends: base >=4.9 && <4.12,
