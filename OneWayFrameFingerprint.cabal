@@ -15,38 +15,33 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
-library
+library Common
   hs-source-dirs: lib
   exposed-modules: Common
   build-depends: base >=4.9 && <4.12,
+                 network >= 2.6,
+                 network-info >= 0.2,
+                 hostname >= 1.0,
+                 bytestring >= 0.10,
                  clock >= 0.7,
-                 formatting >= 6.3
-  ghc-options: -Wall -Wno-redundant-constraints
+                 formatting >= 6.3,
+                 time >= 1.8
+  ghc-options: -Wall -Wno-redundant-constraints -O2
   default-language:    Haskell2010
 
-executable OneWayFrameFingerprintClient
-  main-is:             Client.hs
+executable OneWayFrameFingerprint
+  main-is:             Main.hs
   hs-source-dirs:      src/
-  ghc-options:         -O2 -threaded -with-rtsopts=-N -main-is Client
+  ghc-options:         -Wall -O2 -threaded -with-rtsopts=-N -main-is Main
   build-depends:       base >=4.9 && <4.12,
                        network >= 2.6,
                        network-info >= 0.2,
                        hostname >= 1.0,
                        bytestring >= 0.10,
                        clock >= 0.7,
-                       OneWayFrameFingerprint
-  default-language:    Haskell2010
-
-executable OneWayFrameFingerprintServer
-  main-is:             Server.hs
-  hs-source-dirs:      src/
-  ghc-options:         -O2 -threaded -with-rtsopts=-N -main-is Server
-  build-depends:       base >=4.9 && <4.12,
-                       network >= 2.6,
-                       network-info >= 0.2,
-                       hostname >= 1.0,
-                       bytestring >= 0.10,
-                       clock >= 0.7,
+                       formatting >= 6.3,
                        time >= 1.8,
-                       OneWayFrameFingerprint
+                       Common
+  other-modules:       Client,
+                       Server
   default-language:    Haskell2010

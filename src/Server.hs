@@ -1,12 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
 
-module Server (main) where
+module Server (server) where
 
 import Common
 
-import Data.Bits
-import Data.List
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 
@@ -14,31 +12,13 @@ import Network.Socket
 import Network.Socket.ByteString as ByteStringSocket
 import Network.HostName as NH
 
-import Control.Concurrent
-import Control.Monad
-import System.Exit
-import Data.Char (toLower)
-import System.IO
-
 import System.Clock as SC
 import Data.Time.Clock
 
 type HandlerFunc = SockAddr -> B.ByteString -> String -> IO ()
 
-main :: IO ()
-main = do
-    forkIO realMain
-    exitOnQ
-
-exitOnQ :: IO ()
-exitOnQ = do
-    hSetBuffering stdin NoBuffering
-    c <- getChar
-    when (toLower c /= 'q') exitOnQ
-    exitSuccess  -- or "exitWith" and some ExitCode value, use hoogle.
-
-realMain :: IO ()
-realMain = serveLog "1905" plainHandler
+server :: String -> IO ()
+server udpPort = serveLog udpPort plainHandler
 
 serveLog :: String              -- ^ Port number or name; 514 is default
          -> HandlerFunc         -- ^ Function to handle incoming messages
@@ -72,7 +52,7 @@ serveLog port handlerfunc = withSocketsDo $
 
 -- A simple handler that prints incoming packets
 plainHandler :: HandlerFunc
-plainHandler addr msg hostname =
+plainHandler _ msg hostname =
     do
 #ifdef mingw32_HOST_OS
       monotonicTimeCounter <- getTime Monotonic -- FIXME: Change to MonotonicRaw on Linux
