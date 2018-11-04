@@ -107,9 +107,8 @@ getOsMonotonicCounter =
 #endif
     return monotonicTimeCounter
 
-sendMessage' :: Maybe ServerHandle -> String -> IO ()
-sendMessage' Nothing       _        = error "Nothing in handle"
-sendMessage' (Just handle) response = do {
+sendMessage' :: ServerHandle -> String -> IO ()
+sendMessage' handle response = do {
   sendstr response handle
   ; return ()
 }
@@ -117,10 +116,9 @@ sendMessage' (Just handle) response = do {
 sendMessage :: String -> HostName -> [ServerHandle] -> IO ()
 sendMessage response hostname handles =
     let hostHandle = find (\handle -> hostname == slHostName handle) handles in
-      --trace (show handles)
-      --trace (show hostHandle)
-      --trace (show hostname)
-      (sendMessage' hostHandle response)
+      case hostHandle of
+        Nothing -> trace (show handles) $ trace (show hostHandle) $ trace (show hostname) $ error "Unable to find handle"
+        Just handle -> (sendMessage' handle response)
 
 plainHandler :: [ServerHandle] -> HandlerFunc
 plainHandler handles "PING" _ msg hostname = do
