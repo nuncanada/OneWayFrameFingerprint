@@ -7,3 +7,8 @@ Real World Haskell
 By Bryan O'Sullivan, Donald Stewart, John Goerzen
 
 Publisher: O'Reilly Media
+
+
+Command:
+
+cd ~/OneWayFrameFingerprint && git pull && cabal build && nice -n 15 nohup ~/OneWayFrameFingerprint/dist/build/OneWayFrameFingerprint/OneWayFrameFingerprint > ~/owff_`hostname`.log &

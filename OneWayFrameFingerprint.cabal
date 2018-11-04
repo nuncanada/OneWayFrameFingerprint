@@ -27,7 +27,4 @@ executable OneWayFrameFingerprint
                        clock >= 0.7,
                        formatting >= 6.3,
                        time >= 1.8
-  other-modules:       Common,
-                       Client,
-                       Server
   default-language:    Haskell2010
