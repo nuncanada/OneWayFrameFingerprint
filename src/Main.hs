@@ -22,7 +22,7 @@ import Debug.Trace
 
 cloudServers :: [String]
 --cloudServers = ["TRABALHO-FLAVIO"]
-cloudServers = ["losangeles", "quebec", "saopaulo", "thedalles", "ashburn"]
+cloudServers = ["losangeles-a", "quebec-a", "saopaulo-a", "thedalles-a", "ashburn-a"]
 
 udpPort :: String
 udpPort = "1905"
