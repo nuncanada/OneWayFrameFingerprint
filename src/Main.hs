@@ -33,12 +33,13 @@ cloudServers = fromList([("TRABALHO-FLAVIO",   (read "127.0.0.1" :: IPv4))])
 -}
 
 cloudServers :: Map String IPv4
-cloudServer = fromList([("ashburn-a",    (read "10.150.0.2" :: IPv4)),
-                        ("losangeles-a", (read "10.168.0.2" :: IPv4)),
-                        ("quebec-a",     (read "10.162.0.2" :: IPv4)),
-                        ("saopaulo-a",   (read "10.158.0.2" :: IPv4)),
-                        ("thedalles-a",  (read "10.138.0.2" :: IPv4)),
-                        ])
+cloudServers = fromList([
+      ("ashburn-a",    (read "10.150.0.2" :: IPv4)),
+      ("losangeles-a", (read "10.168.0.2" :: IPv4)),
+      ("quebec-a",     (read "10.162.0.2" :: IPv4)),
+      ("saopaulo-a",   (read "10.158.0.2" :: IPv4)),
+      ("thedalles-a",  (read "10.138.0.2" :: IPv4))
+  ])
 
 udpPort :: String
 udpPort = "1905"
