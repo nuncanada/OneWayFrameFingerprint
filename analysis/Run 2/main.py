@@ -21,8 +21,18 @@ import statistics
 import sys
 import glob
 
+
 formatoAgrupador = "%Y-%m-%d %H:%M"
 runDirectory = 'E:\\dados_experimento\\Run 2\\paths\\'
+
+cloudServers = {
+      '10.150.0.2': 'ashburn',
+      '10.168.0.2': 'losangeles',
+      '10.162.0.2': 'quebec',
+      '10.158.0.2': 'saopaulo',
+      '10.138.0.2': 'thedalles'
+}
+
 
 '''
 [
@@ -35,9 +45,74 @@ runDirectory = 'E:\\dados_experimento\\Run 2\\paths\\'
 ]
 '''
 
+def plot_point_cov(points, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma ellipse based on the mean and covariance of a point
+    "cloud" (points, an Nx2 array).
+
+    Parameters
+    ----------
+        points : An Nx2 array of the data points.
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    pos = points.mean(axis=0)
+    cov = np.cov(points, rowvar=False)
+    return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
+
+def plot_cov_ellipse(cov, pos, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma error ellipse based on the specified covariance
+    matrix (`cov`). Additional keyword arguments are passed on to the
+    ellipse patch artist.
+
+    Parameters
+    ----------
+        cov : The 2x2 covariance matrix to base the ellipse on
+        pos : The location of the center of the ellipse. Expects a 2-element
+            sequence of [x0, y0].
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    def eigsorted(cov):
+        vals, vecs = np.linalg.eigh(cov)
+        order = vals.argsort()[::-1]
+        return vals[order], vecs[:,order]
+
+    if ax is None:
+        ax = plt.gca()
+
+    vals, vecs = eigsorted(cov)
+    theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
+
+    # Width and height are "full" widths, not radius
+    width, height = 2 * nstd * np.sqrt(vals)
+    ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+
+    ax.add_artist(ellip)
+    return ellip
+
+
 def extractUnidirectionalPingData(log):
     unidirectionalPingData={}
     rawClockCurrentTimeTranslation={}
+    receiverIp = ""
+    pongIp = ""
+
     with open(log, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         i=0
@@ -119,14 +194,8 @@ def extractUnidirectionalPingData(log):
                 #zeroPad a direita!!!!!
                 timeAgrupator = recvDateTime_struct.strftime(formatoAgrupador)
 
-                if receiverIp not in unidirectionalPingData.keys():
-                    unidirectionalPingData[receiverIp] = {}
-
-                if pongIp not in unidirectionalPingData[receiverIp].keys():
-                    unidirectionalPingData[receiverIp][pongIp] = {}
-
-                if timeAgrupator not in unidirectionalPingData[receiverIp][pongIp].keys():
-                    unidirectionalPingData[receiverIp][pongIp][timeAgrupator] = []
+                if timeAgrupator not in unidirectionalPingData.keys():
+                    unidirectionalPingData[timeAgrupator] = []
 
                 itemPingData = {
                     'receiverTime': receiverTime,
@@ -149,56 +218,41 @@ def extractUnidirectionalPingData(log):
                 itemPingData['pingRaw'] = pingRaw
 
                 if (not pingIp in rawClockCurrentTimeTranslation):
-                    rawClockCurrentTimeTranslation[pingIp] = pingTimestamp - pingRaw
+                    rawClockCurrentTimeTranslation['ping'] = pingTimestamp - pingRaw
 
                 if (not pongIp in rawClockCurrentTimeTranslation):
-                    rawClockCurrentTimeTranslation[pongIp] = pongTimestamp - pongRaw
+                    rawClockCurrentTimeTranslation['pong'] = pongTimestamp - pongRaw
 
-                unidirectionalPingData[receiverIp][pongIp][timeAgrupator].append(itemPingData)
+                unidirectionalPingData[timeAgrupator].append(itemPingData)
 
-        return unidirectionalPingData, rawClockCurrentTimeTranslation
+    return receiverIp, pongIp, unidirectionalPingData, rawClockCurrentTimeTranslation
 
 def extractPingDifference(unidirectionalPingData, rawClockCurrentTimeTranslation):
     pingDifference = {}
-    for receiver in unidirectionalPingData:
-        pingDifference[receiver] = {}
-        for sender in unidirectionalPingData[receiver]:
-            pingDifference[receiver][sender] = {}
-            for agrupator in unidirectionalPingData[receiver][sender]:
-                pingDifference[receiver][sender][agrupator] = []
-                for item in unidirectionalPingData[receiver][sender][agrupator]:
-                    #pprint(rawClockCurrentTimeTranslation, file=currentLog)
-                    #print('item[''pongRaw'']:' + str(item['pongRaw']), file=currentLog)
-                    #print('item[''pingRaw'']:' + str(item['pingRaw']), file=currentLog)
-                    #print('item[''recvRaw'']:' + str(item['recvRaw']), file=currentLog)
-                    sdiff = (2 * item['pongRaw'] + 2 * int(rawClockCurrentTimeTranslation[sender])) - item['pingRaw'] - item['recvRaw'] - 2*int(rawClockCurrentTimeTranslation[receiver])
-                    #print('sdiff: ' + str(sdiff), file=currentLog)
-                    #sdiff = (2 * pongTimestamp) - pingTimestamp - recvTimestamp
-                    pingDifference[receiver][sender][agrupator].append(sdiff)
+    for agrupator in unidirectionalPingData:
+        pingDifference[agrupator] = []
+        for item in unidirectionalPingData[agrupator]:
+            #pprint(rawClockCurrentTimeTranslation, file=currentLog)
+            #print('item[''pongRaw'']:' + str(item['pongRaw']), file=currentLog)
+            #print('item[''pingRaw'']:' + str(item['pingRaw']), file=currentLog)
+            #print('item[''recvRaw'']:' + str(item['recvRaw']), file=currentLog)
+            sdiff = (2 * item['pongRaw'] + 2 * int(rawClockCurrentTimeTranslation['pong'])) - item['pingRaw'] - item['recvRaw'] - 2*int(rawClockCurrentTimeTranslation['ping'])
+            #print('sdiff: ' + str(sdiff), file=currentLog)
+            #sdiff = (2 * pongTimestamp) - pingTimestamp - recvTimestamp
+            pingDifference[agrupator].append(sdiff)
 
     return pingDifference
 
 def statiticalFitPingData(pingDifference):
     perMinuteStatistics = {}
 
-    for senderName, dictReceivers in pingDifference.items():
-
-        if senderName not in perMinuteStatistics.keys():
-            perMinuteStatistics[senderName] = {}
-
-        for receiverName, minutes in dictReceivers.items():
-
-            if receiverName not in perMinuteStatistics[senderName].keys():
-                perMinuteStatistics[senderName][receiverName] = {}
-
-            for minute, oneWayLantecyList in minutes.items():
-
-                if (len(oneWayLantecyList) > 1):
-                    perMinuteStatistics[senderName][receiverName][minute] = {
-                        'min':   min(oneWayLantecyList),
-                        'mean':  statistics.mean(oneWayLantecyList),
-                        'stdev': statistics.stdev(oneWayLantecyList)
-                    }
+    for minute, oneWayLantecyList in pingDifference.items():
+        if (len(oneWayLantecyList) > 1):
+            perMinuteStatistics[minute] = {
+                'min':   min(oneWayLantecyList),
+                'mean':  statistics.mean(oneWayLantecyList),
+                'stdev': statistics.stdev(oneWayLantecyList)
+            }
 
     return perMinuteStatistics
 
@@ -206,68 +260,33 @@ def findAllLogs(runDirectory):
     logFiles = glob.glob(runDirectory + '**/*.log', recursive=True)
     return logFiles
 
-#logs = findAllLogs(runDirectory)
-logs = ['E:/dados_experimento/Run 2/paths/10.168.0.2_10.162.0.2/sample.log']
-for log in logs:
-
-    pprint(log)
-    currentLog = open(log + ".out", "w")
-
-    unidirectionalPingData, rawClockCurrentTimeTranslation = extractUnidirectionalPingData(log)
-    #pprint(unidirectionalPingData, file=currentLog)
-
-    pingDifference = extractPingDifference(unidirectionalPingData, rawClockCurrentTimeTranslation)
-    #pprint(pingDifference, file=currentLog)
-    #pprint(rawClockCurrentTimeTranslation, file=currentLog)
-
-    perMinuteStatistics = statiticalFitPingData(pingDifference)
-    pprint(perMinuteStatistics)
-    pprint(perMinuteStatistics, stream=currentLog)
+def subtractOneDirectionFromTheOther(forwardPerMinuteStatistics, backwardsPerMinuteStatistics):
 
     diffPerMinute = {}
 
-    for senderName, dictReceivers in perMinuteStatistics.items():
-        for receiverName, minutes in dictReceivers.items():
+    numOfEntries = 0
+    minSum = 0
+    meanSum = 0
+    for minute, meanMinStdev in forwardPerMinuteStatistics.items():
+        if (minute in backwardsPerMinuteStatistics):
+            numOfEntries = numOfEntries + 1
 
-            biggerIp = max(senderName, receiverName)
-            smallerIp = min(senderName, receiverName)
+            diffMean = forwardPerMinuteStatistics[minute]['mean'] - backwardsPerMinuteStatistics[minute]['mean']
+            # 2*p(x) - p(x-1) - p(x+1) = 2*
+            #receiver - sender = 2*
+            diffMean = diffMean/4
 
-            if biggerIp not in diffPerMinute.keys():
-                diffPerMinute[biggerIp] = {}
+            #pprint(minuteSplit, file=currentLog)
+            #print(minutesSinceMidnight, file=currentLog)
 
-            if smallerIp not in diffPerMinute[biggerIp].keys():
-                diffPerMinute[biggerIp][smallerIp] = {}
-
-            numOfEntries = 0
-            minSum = 0
-            meanSum = 0
-            for minute, meanMinStdev in minutes.items():
-                if (minute in perMinuteStatistics[receiverName][senderName]):
-                    numOfEntries = numOfEntries + 1
-
-                    if receiverName != senderName:
-                        diffMean = perMinuteStatistics[senderName][receiverName][minute]['mean'] - perMinuteStatistics[receiverName][senderName][minute]['mean']
-                        # 2*p(x) - p(x-1) - p(x+1) = 2*
-                        #receiver - sender = 2*
-                        diffMean = diffMean/4
-
-                        #if abs(diffMean) > 300000:
-                        #    diffMean = 300000 * (np.sign(diffMean))
-
-                        dateSplit = minute.split(" ")
-                        minuteSplit = dateSplit[1].split(":")
-                        minutesSinceMidnight = int(minuteSplit[0]) * 60 + int(minuteSplit[1])
-
-                        #pprint(minuteSplit, file=currentLog)
-                        #print(minutesSinceMidnight, file=currentLog)
-
-                        diffPerMinute[biggerIp][smallerIp][minute] = diffMean
-                    else:
-                        diffPerMinute[biggerIp][smallerIp][minute] = perMinuteStatistics[senderName][receiverName][minute]['mean']
+            diffPerMinute[minute] = diffMean
 
             #pprint(diffPerMinute, file=currentLog)
 
-    #pprint(diffPerMinute, file=currentLog)
+    return diffPerMinute
+
+def plotPingDifferences(diffPerMinute):
+
     for key1 in diffPerMinute:
         for key2 in diffPerMinute[key1]:
             lists = sorted(diffPerMinute[key1][key2].items()) # sorted by key, return a list of tuples
@@ -319,8 +338,39 @@ for log in logs:
             pprint(x, stream=currentLog)
             pprint(y, stream=currentLog)
             data = [go.Scatter(x=x,y=y)]
+
+            errorellipse.plot_point_cov(data, nstd=1, alpha=0.5, color='green')
+            errorellipse.plot_point_cov(data, nstd=2, alpha=0.5, color='blue')
+            errorellipse.plot_point_cov(data, nstd=3, alpha=0.5, color='red')
+
             plotly.offline.plot(data, filename=log + '.html')
 
+def changeFromDateToMinuteStartingAtZero(diffPerMinute):
+
+#logs = findAllLogs(runDirectory)
+logs = ['E:/dados_experimento/Run 2/paths/10.168.0.2_10.162.0.2/sample.log']
+for log in logs:
+
+    pprint(log)
+    currentLog = open(log + ".out", "w")
+
+    receiverIp, pongerIp, unidirectionalPingData, rawClockCurrentTimeTranslation = extractUnidirectionalPingData(log)
+    #pprint(unidirectionalPingData, file=currentLog)
+
+    pingDifference = extractPingDifference(unidirectionalPingData, rawClockCurrentTimeTranslation)
+    #pprint(pingDifference, file=currentLog)
+    #pprint(rawClockCurrentTimeTranslation, file=currentLog)
+
+    perMinuteStatistics = statiticalFitPingData(pingDifference)
+    pprint(perMinuteStatistics)
+    pprint(perMinuteStatistics, stream=currentLog)
+
+    diffPerMinute = subtractOneDirectionFromTheOther(perMinuteStatistics)
+    #pprint(diffPerMinute, file=currentLog)
+
+    diffPerMinute = changeFromDateToMinuteStartingAtZero(diffPerMinute)
+
+    plotPingDifferences(diffPerMinute)
 
 #pprint(diffPerMinute, file=currentLog)
 
