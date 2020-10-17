@@ -1,5 +1,7 @@
 import csv
 import time
+import gzip
+
 from datetime import datetime
 from pprint import pprint
 
@@ -21,9 +23,10 @@ import statistics
 import sys
 import glob
 
+import pickle
 
-formatoAgrupador = "%Y-%m-%d %H:%M"
-runDirectory = 'E:\\dados_experimento\\Run 2\\paths\\'
+formatoAgrupador = "%Y-%m-%d %H:%M:%S"
+runDirectory = 'E:\\dados_experimento\\Run 2 - raw\\'
 
 cloudServers = {
       '10.150.0.2': 'ashburn',
@@ -32,18 +35,6 @@ cloudServers = {
       '10.158.0.2': 'saopaulo',
       '10.138.0.2': 'thedalles'
 }
-
-
-'''
-[
-    'E:/dados_experimento/Run 2/paths/10.162.0.2_10.138.0.2/2018-11-17.log',
-    'E:/dados_experimento/Run 2/paths/10.162.0.2_10.138.0.2/2018-11-18.log',
-    'E:/dados_experimento/Run 2/paths/10.162.0.2_10.138.0.2/2018-11-19.log',
-    'E:/dados_experimento/Run 2/paths/10.168.0.2_10.162.0.2/2018-11-13.log',
-    'E:/dados_experimento/Run 2/paths/10.168.0.2_10.162.0.2/sample.log',
-    'E:/dados_experimento/Run 2/paths/10.168.0.2_10.158.0.2/2018-11-17.log',
-]
-'''
 
 def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     """
@@ -106,144 +97,18 @@ def plot_cov_ellipse(cov, pos, nstd=2, ax=None, **kwargs):
     ax.add_artist(ellip)
     return ellip
 
-
-def extractUnidirectionalPingData(log):
-    unidirectionalPingData={}
-    rawClockCurrentTimeTranslation={}
-    receiverIp = ""
-    pongIp = ""
-
-    with open(log, newline='', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        i=0
-        for row in reader:
-            i=i+1
-
-            if len(row) > 9:
-                receiverTime = row[0][5:]
-                receiverIp = row[1]
-                recvRawClock = row[2]
-                pongTime = row[3][5:]
-                pongIp = row[4]
-                pongRawClock = row[5]
-                pingTime = row[6][5:]
-                pingIp = row[8]
-                pingRawClock = row[9]
-
-                #print('row: ', file=currentLog)
-                #pprint(row, file=currentLog)
-
-                #print('receiverTime' + receiverTime, file=currentLog)
-                #print('receiverIp' + receiverIp, file=currentLog, file=currentLog)
-                #print('pongTime' + pongTime, file=currentLog)
-                #print('pongIp' + pongIp, file=currentLog)
-                #print('pingTime' + pingTime, file=currentLog)
-                #print('pingIp' + pingIp, file=currentLog)
-
-                recv = receiverTime.split(".")
-                pong = pongTime.split(".")
-                ping = pingTime.split(".")
-
-                recvDateTime = recv[0]
-                pongDateTime = pong[0]
-                pingDateTime = ping[0]
-
-                recvSplitNanoSecondsTZ = recv[1].split(" ")
-                pongSplitNanoSecondsTZ = pong[1].split(" ")
-                pingSplitNanoSecondsTZ = ping[1].split(" ")
-
-                recvNanoSeconds = recvSplitNanoSecondsTZ[0] + ("0" * (9 - len(recvSplitNanoSecondsTZ[0])))
-                pongNanoSeconds = pongSplitNanoSecondsTZ[0] + ("0" * (9 - len(pongSplitNanoSecondsTZ[0])))
-                pingNanoSeconds = pingSplitNanoSecondsTZ[0] + ("0" * (9 - len(pingSplitNanoSecondsTZ[0])))
-
-                formatoSemNano = "%Y-%m-%d %H:%M:%S"
-                recvDateTime_struct = datetime.strptime(recvDateTime, formatoSemNano)
-                pongDateTime_struct = datetime.strptime(pongDateTime, formatoSemNano)
-                pingDateTime_struct = datetime.strptime(pingDateTime, formatoSemNano)
-
-                recvTimestamp = (int(time.mktime(recvDateTime_struct.timetuple())) * 1000000000) + int(recvNanoSeconds)
-                pongTimestamp = (int(time.mktime(pongDateTime_struct.timetuple())) * 1000000000) + int(pongNanoSeconds)
-                pingTimestamp = (int(time.mktime(pingDateTime_struct.timetuple())) * 1000000000) + int(pingNanoSeconds)
-
-                pongRawClockSplit = pongRawClock.split(".")
-                pongRaw = int(pongRawClockSplit[0]) * 1000000000 + int(pongRawClockSplit[1])
-
-                recvRawClockSplit = recvRawClock.split(".")
-                recvRaw = int(recvRawClockSplit[0]) * 1000000000 + int(recvRawClockSplit[1])
-
-                pingRawClockSplit = pingRawClock.split(".")
-                pingRaw = int(pingRawClockSplit[0]) * 1000000000 + int(pingRawClockSplit[1])
-
-                #print('recvRaw: ' + str(recvRaw), file=currentLog)
-                #print('pongRaw: ' + str(pongRaw), file=currentLog)
-                #print('pingRaw: ' + str(pingRaw), file=currentLog)
-
-                #print('recv: ' + str(time.mktime(recvDateTime_struct.timetuple())), file=currentLog)
-                #print('pong: ' + str(time.mktime(pongDateTime_struct.timetuple())), file=currentLog)
-                #print('ping: ' + str(time.mktime(pingDateTime_struct.timetuple())), file=currentLog)
-
-                #print('pingTimestamp: ' + str(pingTimestamp), file=currentLog)
-                #print('pongTimestamp: ' + str(pongTimestamp), file=currentLog)
-
-                #print('recvNanoSeconds: ' + recvNanoSeconds, file=currentLog)
-                #print('pongNanoSeconds: ' + pongNanoSeconds, file=currentLog)
-                #print('pingNanoSeconds: ' + pingNanoSeconds, file=currentLog)
-
-                #2018-09-16 00:12:16.028738088 UTC,losangeles-a,767220140697080,10,quebec-a,767170600445988
-                #2018-09-16 00:12:16.1289813
-                #zeroPad a direita!!!!!
-                timeAgrupator = recvDateTime_struct.strftime(formatoAgrupador)
-
-                if timeAgrupator not in unidirectionalPingData.keys():
-                    unidirectionalPingData[timeAgrupator] = []
-
-                itemPingData = {
-                    'receiverTime': receiverTime,
-                    'receiverIp': receiverIp,
-                    'recvRawClock': recvRawClock,
-                    'pongTime':  pongTime,
-                    'pongIp': pongIp,
-                    'pongRawClock': pongRawClock,
-                    'pingTime': pingTime,
-                    'pingIp': pingIp,
-                    'pingRawClock': pingRawClock
-                }
-
-                itemPingData['recvTimestamp'] = recvTimestamp
-                itemPingData['pongTimestamp'] = pongTimestamp
-                itemPingData['pingTimestamp'] = pingTimestamp
-
-                itemPingData['recvRaw'] = recvRaw
-                itemPingData['pongRaw'] = pongRaw
-                itemPingData['pingRaw'] = pingRaw
-
-                if (not pingIp in rawClockCurrentTimeTranslation):
-                    rawClockCurrentTimeTranslation['ping'] = pingTimestamp - pingRaw
-
-                if (not pongIp in rawClockCurrentTimeTranslation):
-                    rawClockCurrentTimeTranslation['pong'] = pongTimestamp - pongRaw
-
-                unidirectionalPingData[timeAgrupator].append(itemPingData)
-
-    return receiverIp, pongIp, unidirectionalPingData, rawClockCurrentTimeTranslation
-
-def extractPingDifference(unidirectionalPingData, rawClockCurrentTimeTranslation):
+def extractPingDifference(unidirectionalPingData):
     pingDifference = {}
     for agrupator in unidirectionalPingData:
         pingDifference[agrupator] = []
         for item in unidirectionalPingData[agrupator]:
-            #pprint(rawClockCurrentTimeTranslation, file=currentLog)
-            #print('item[''pongRaw'']:' + str(item['pongRaw']), file=currentLog)
-            #print('item[''pingRaw'']:' + str(item['pingRaw']), file=currentLog)
-            #print('item[''recvRaw'']:' + str(item['recvRaw']), file=currentLog)
-            sdiff = (2 * item['pongRaw'] + 2 * int(rawClockCurrentTimeTranslation['pong'])) - item['pingRaw'] - item['recvRaw'] - 2*int(rawClockCurrentTimeTranslation['ping'])
-            #print('sdiff: ' + str(sdiff), file=currentLog)
-            #sdiff = (2 * pongTimestamp) - pingTimestamp - recvTimestamp
+            #sdiff = (2 * item['pongRaw'] + 2 * int(estimatedPongTimestampRawTranslation)) - item['pingRaw'] - item['recvRaw'] - 2*int(estimatedPingTimestampRawTranslation)
+            sdiff = 2 * item['pongRaw'] - item['pingRaw'] - item['recvRaw']
             pingDifference[agrupator].append(sdiff)
 
     return pingDifference
 
-def statiticalFitPingData(pingDifference):
+def getMeanStdevData(pingDifference):
     perMinuteStatistics = {}
 
     for minute, oneWayLantecyList in pingDifference.items():
@@ -256,7 +121,14 @@ def statiticalFitPingData(pingDifference):
 
     return perMinuteStatistics
 
-def findAllLogs(runDirectory):
+def useMeanAsValue(perMinuteStatistics):
+    plotableData = {}
+    for minute, statistics in perMinuteStatistics.items():
+        plotableData[minute] = statistics['mean']
+
+    return plotableData
+
+def findAllLogsRecursive(runDirectory):
     logFiles = glob.glob(runDirectory + '**/*.log', recursive=True)
     return logFiles
 
@@ -274,7 +146,7 @@ def subtractOneDirectionFromTheOther(forwardPerMinuteStatistics, backwardsPerMin
             diffMean = forwardPerMinuteStatistics[minute]['mean'] - backwardsPerMinuteStatistics[minute]['mean']
             # 2*p(x) - p(x-1) - p(x+1) = 2*
             #receiver - sender = 2*
-            diffMean = diffMean/4
+            diffMean = diffMean/2
 
             #pprint(minuteSplit, file=currentLog)
             #print(minutesSinceMidnight, file=currentLog)
@@ -285,114 +157,194 @@ def subtractOneDirectionFromTheOther(forwardPerMinuteStatistics, backwardsPerMin
 
     return diffPerMinute
 
-def plotPingDifferences(diffPerMinute):
+def linearFitData(pingDiffPerMinute, maxDeviation = 3):
+    result = {}
 
-    for key1 in diffPerMinute:
-        for key2 in diffPerMinute[key1]:
-            lists = sorted(diffPerMinute[key1][key2].items()) # sorted by key, return a list of tuples
+    lists = sorted(pingDiffPerMinute.items())
+    #print("lists")
+    #pprint(lists)
 
-            x, y = zip(*lists) # unpack a list of pairs into two tuples
-            pprint(x)
-            pprint(y)
+    xTuple, yTuple = zip(*lists) # unpack a list of pairs into two tuples
+    slope, intercept, r_value, p_value, std_err = stats.linregress(xTuple, yTuple)
 
-            slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
+    #pprint(xTuple, file=currentLog)
+    #pprint(yTuple, file=currentLog)
+    print('slope: ' + str(slope))
+    print('intercept: ' + str(intercept))
+    print('r_value: ' + str(r_value))
+    print('p_value: ' + str(p_value))
+    print('std_err: ' + str(std_err))
 
-            for x in diffPerMinute[key1][key2]:
-                diffPerMinute[key1][key2][x] = diffPerMinute[key1][key2][x] - intercept - (x * slope)
+    minValue = - maxDeviation * abs(std_err)
+    maxValue = maxDeviation * abs(std_err)
 
-            pprint(lists, stream=currentLog)
+    for x, y in pingDiffPerMinute.items():
+        newY = (y - intercept) - (x * slope)
+        if (newY < minValue or newY > maxValue):
+            result[x] = newY
 
-            pprint(diffPerMinute, stream=currentLog)
+    #pprint(lists, stream=currentLog)
+    #pprint(result, stream=currentLog)
 
-            elements = np.array(list(diffPerMinute[biggerIp][smallerIp].values()))
-            #pprint(elements, file=currentLog)
-            mean = np.mean(elements, axis=0)
-            sd = np.std(elements, axis=0)
+    return result
 
-            print('mean: ' + str(mean), file=currentLog)
-            print('sd: ' + str(sd), file=currentLog)
+def plotConfidenceEllipses(data):
+    plot_point_cov(data, nstd=1, alpha=0.5, color='green')
+    plot_point_cov(data, nstd=2, alpha=0.5, color='blue')
+    plot_point_cov(data, nstd=3, alpha=0.5, color='red')
 
-            maxDeviation = 2
+def removePointsMaxDeviation(pingDiffPerMinute, maxDeviation = 1):
+    elements = np.array(list(pingDiffPerMinute.values()))
+    #pprint(elements, file=currentLog)
+    mean = np.mean(elements, axis=0)
+    sd = np.std(elements, axis=0)
 
-            minValue = mean - maxDeviation * abs(sd)
-            maxValue = mean + maxDeviation * abs(sd)
+    print('mean: ' + str(mean), file=currentLog)
+    print('sd: ' + str(sd), file=currentLog)
 
-            for minutesSinceMidnight in diffPerMinute[biggerIp][smallerIp]:
-                currentValue = diffPerMinute[biggerIp][smallerIp][minutesSinceMidnight]
+    minValue = mean - maxDeviation * abs(sd)
+    maxValue = mean + maxDeviation * abs(sd)
 
-                if currentValue > maxValue:
-                    diffPerMinute[biggerIp][smallerIp][minutesSinceMidnight] = maxValue
-                if currentValue < minValue:
-                    diffPerMinute[biggerIp][smallerIp][minutesSinceMidnight] = minValue
+    setWithPointsRemoved = {}
+    for minutesSinceMidnight in pingDiffPerMinute:
+        currentValue = pingDiffPerMinute[minutesSinceMidnight]
 
-            pprint(diffPerMinute, stream=currentLog)
+        #if (currentValue < maxValue and currentValue > minValue):
+        setWithPointsRemoved[minutesSinceMidnight] = currentValue
 
-            #pprint(x, file=currentLog)
-            #pprint(y, file=currentLog)
-            print('slope: ' + str(slope), file=currentLog)
-            print('intercept: ' + str(intercept), file=currentLog)
+    #    if currentValue > maxValue:
+    #        pingDiffPerMinute[minutesSinceMidnight] = maxValue
+    #    if currentValue < minValue:
+    #        pingDiffPerMinute[minutesSinceMidnight] = minValue
 
-            lists = sorted(diffPerMinute[key1][key2].items()) # sorted by key, return a list of tuples
-            x, y = zip(*lists) # unpack a list of pairs into two tuples
+    #pprint(setWithPointsRemoved, stream=currentLog)
 
-            pprint(x, stream=currentLog)
-            pprint(y, stream=currentLog)
-            data = [go.Scatter(x=x,y=y)]
+    return setWithPointsRemoved
 
-            errorellipse.plot_point_cov(data, nstd=1, alpha=0.5, color='green')
-            errorellipse.plot_point_cov(data, nstd=2, alpha=0.5, color='blue')
-            errorellipse.plot_point_cov(data, nstd=3, alpha=0.5, color='red')
+def plotPing(pingDiffPerMinute, outputFileName):
 
-            plotly.offline.plot(data, filename=log + '.html')
+    lists = sorted(pingDiffPerMinute.items()) # sorted by key, return a list of tuples
+    x, y = zip(*lists) # unpack a list of pairs into two tuples
 
-def changeFromDateToMinuteStartingAtZero(diffPerMinute):
+    #pprint(x, stream=currentLog)
+    #pprint(y, stream=currentLog)
+    data = [go.Scatter(x=x,y=y)]
 
-#logs = findAllLogs(runDirectory)
-logs = ['E:/dados_experimento/Run 2/paths/10.168.0.2_10.162.0.2/sample.log']
-for log in logs:
+    plotly.offline.plot(data, filename=outputFileName)
 
-    pprint(log)
-    currentLog = open(log + ".out", "w")
+def fromPingDataToNormalized(unidirectionalPingData):
 
-    receiverIp, pongerIp, unidirectionalPingData, rawClockCurrentTimeTranslation = extractUnidirectionalPingData(log)
-    #pprint(unidirectionalPingData, file=currentLog)
+    perMinuteStatistics = getMeanStdevData(pingDifference)
+    print("perMinuteStatistics")
+    print(str(datetime.now()))
+    #pprint(perMinuteStatistics)
+    #pprint(perMinuteStatistics, stream=currentLog)
 
-    pingDifference = extractPingDifference(unidirectionalPingData, rawClockCurrentTimeTranslation)
-    #pprint(pingDifference, file=currentLog)
-    #pprint(rawClockCurrentTimeTranslation, file=currentLog)
+    plotableData = useMeanAsValue(perMinuteStatistics)
+    print("plotableData")
+    print(str(datetime.now()))
+    #pprint(plotableData)
 
-    perMinuteStatistics = statiticalFitPingData(pingDifference)
-    pprint(perMinuteStatistics)
-    pprint(perMinuteStatistics, stream=currentLog)
+    timestampKeyData = changeKeysFromDatetimeToTimestamp(plotableData)
+    print("timestampKeyData")
+    print(str(datetime.now()))
+    #pprint(zeroStartingData)
 
-    diffPerMinute = subtractOneDirectionFromTheOther(perMinuteStatistics)
-    #pprint(diffPerMinute, file=currentLog)
+    normalizedData = linearFitData(timestampKeyData)
+    print("normalizedData")
+    print(str(datetime.now()))
+    #pprint(normalizedData)
 
-    diffPerMinute = changeFromDateToMinuteStartingAtZero(diffPerMinute)
+    return normalizedData
 
-    plotPingDifferences(diffPerMinute)
+def changeKeysFromDatetimeToTimestamp(diffPerMinute):
+    listaTimestamp = {}
 
-#pprint(diffPerMinute, file=currentLog)
+    for minuto, ping in diffPerMinute.items():
+        listaTimestamp[datetime.strptime(minuto, formatoAgrupador).timestamp()] = ping
+
+    return listaTimestamp
 
 
-#        dadosQuebec = unidirectionalPingData['quebec-a']
+def changeKeysFromTimestampToDatetime(diffPerMinute):
+    listaDatetime = {}
 
-#        diferencaEntreMedidas = {}
-#        x = []
-#        y = []
-#        for key in dadosQuebec.keys():
-#            if (key-1) in dadosQuebec.keys():
-#                temp = dadosQuebec[key] - dadosQuebec[key-1]
-#                x.append(key)
-#                y.append(temp)
-#                diferencaEntreMedidas[key] = temp
+    for timestamp, ping in diffPerMinute.items():
+        listaDatetime[datetime.utcfromtimestamp(timestamp).strftime(formatoAgrupador)] = ping
 
-#        print("Direferenca entre medidas calculado", file=currentLog)
+    return listaDatetime
 
-        # Generated linear fit
-#        slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
-        #line = slope*xi+intercept
-#        print(slope, file=currentLog)
-#        print(intercept, file=currentLog)
-#        print(r_value, file=currentLog)
-#        print(std_err, file=currentLog)
+
+def getUnidirectionalPingDataFromPickle(log, pongServerName):
+    picklefile = log + "_" + pongServerName + "_unidirectional.pickle"
+    unidirectionalPingData = pickle.load( open( picklefile, "rb" ) )
+    return unidirectionalPingData
+
+for pingIp, pingServerName in cloudServers.items():
+
+    logs = findAllGzipedLogs(runDirectory + '/' + pingServerName + '/')
+
+    for pongIp, pongServerName in cloudServers.items():
+        unidirectionalPingDataUnitingAllDays = {}
+        bidirectionalPingDataUnitingAllDays = {}
+
+        for log in logs:
+
+            pprint(log)
+            currentLog = open(log + "_" + pongServerName + ".out", "w")
+
+            #Apenas dados de um servidor por vez.
+            print("getUnidirectionalPingDataFromPickle")
+            print(str(datetime.now()))
+            unidirectionalPingData = getUnidirectionalPingDataFromPickle(log, pongServerName)
+            print(str(datetime.now()))
+            #pprint(unidirectionalPingData)
+
+            #Por enquanto pega o primeiro item mesmo... Não acho que valha a pena alguma coisa mais complicada
+            #firstItem = unidirectionalPingData[list(unidirectionalPingData.keys())[0]][0]
+            #pprint(firstItem)
+
+            #estimatedPingTimestampRawTranslation = firstItem['pingTimestamp'] - firstItem['pingRaw']
+            #estimatedPongTimestampRawTranslation = firstItem['pongTimestamp'] - firstItem['pongRaw']
+
+            #pprint(unidirectionalPingData, file=currentLog)
+
+
+            print("extractPingDifference")
+            print(str(datetime.now()))
+            pingDifference = extractPingDifference(unidirectionalPingData)
+            print(str(datetime.now()))
+            #pprint(pingDifference, file=currentLog)
+            #pprint(rawClockCurrentTimeTranslation, file=currentLog)
+
+            print("Normalizing Data")
+            print(str(datetime.now()))
+            normalizedData = fromPingDataToNormalized(unidirectionalPingData);
+            print(str(datetime.now()))
+
+
+            print("Changing from timestamp to DateTime")
+            print(str(datetime.now()))
+            dateTimeKeysData = changeKeysFromTimestampToDatetime(normalizedData)
+            print(str(datetime.now()))
+
+            print("Plotting")
+            print(str(datetime.now()))
+            plotPing(dateTimeKeysData, log + '_unidirectional_' + pongServerName + '.html')
+            print(str(datetime.now()))
+
+            #backwardsPerMinuteStatistics
+
+            #diffPerMinute = subtractOneDirectionFromTheOther(perMinuteStatistics)
+            #diffPerMinute = changeFromDateToMinuteStartingAtZero(diffPerMinute)
+            #plotPingDifferences(diffPerMinute)
+
+        unidirectionalPingDataUnitingAllDays = {**unidirectionalPingDataUnitingAllDays, **unidirectionalPingData}
+        normalizedDataAllDays = fromPingDataToNormalized(unidirectionalPingDataUnitingAllDays);
+        normalizedDataWithoutDeviantPointsAllDays = removePointsMaxDeviation(normalizedDataAllDays)
+        dateTimeKeysDataAllDays = changeKeysFromTimestampToDatetime(normalizedDataWithoutDeviantPointsAllDays)
+        plotPing(dateTimeKeysDataAllDays, runDirectory + 'unidirectional_' + pingServerName + '_' + pongServerName + '.html')
+
+        #bidirectionalPingDataUnitingAllDays = {**bidirectionalPingDataUnitingAllDays, **bidirectionalPingData}
+        #diffPerMinute = subtractOneDirectionFromTheOther(perMinuteStatistics)
+        #pprint(diffPerMinute, file=currentLog)

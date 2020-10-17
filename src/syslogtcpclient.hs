@@ -1,4 +1,3 @@
-{-- snippet all --}
 import Data.Bits
 import Network.Socket
 import Network.BSD
@@ -6,7 +5,7 @@ import Data.List
 import SyslogTypes
 import System.IO
 
-data SyslogHandle = 
+data SyslogHandle =
     SyslogHandle {slHandle :: Handle,
                   slProgram :: String}
 
@@ -38,7 +37,7 @@ openlog hostname port progname =
        -- explicitly call hFlush after each message, below, so that
        -- messages get logged immediately
        hSetBuffering h (BlockBuffering Nothing)
-       
+
        -- Save off the socket, program name, and server address in a handle
        return $ SyslogHandle h progname
 
@@ -58,7 +57,6 @@ closelog syslogh = hClose (slHandle syslogh)
 makeCode :: Facility -> Priority -> Int
 makeCode fac pri =
     let faccode = codeOfFac fac
-        pricode = fromEnum pri 
+        pricode = fromEnum pri
         in
           (faccode `shiftL` 3) .|. pricode
-{-- /snippet all --}

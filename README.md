@@ -11,4 +11,6 @@ Publisher: O'Reilly Media
 
 Command:
 
-cd ~/OneWayFrameFingerprint && git pull && cabal build && nice -n 15 nohup ~/OneWayFrameFingerprint/dist/build/OneWayFrameFingerprint/OneWayFrameFingerprint > ~/owff_`hostname`.log &
+cd ~/OneWayFrameFingerprint && git pull && nice -n 15 nohup ~/OneWayFrameFingerprint/OneWayFrameFingerprint &
+
+// > ~/owff_`hostname`.log &

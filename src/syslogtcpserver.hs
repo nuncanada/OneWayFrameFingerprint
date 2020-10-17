@@ -1,4 +1,3 @@
-{-- snippet all --}
 import Data.Bits
 import Network.Socket
 import Network.BSD
@@ -42,7 +41,7 @@ serveLog port handlerfunc = withSocketsDo $
           procRequests lock mastersock =
               do (connsock, clientaddr) <- accept mastersock
                  handle lock clientaddr
-                    "syslogtcpserver.hs: client connnected"
+                    "syslogtcpserver.hs: client connnected: " ++ (show clientaddr)
                  forkIO $ procMessages lock connsock clientaddr
                  procRequests lock mastersock
 
@@ -55,7 +54,7 @@ serveLog port handlerfunc = withSocketsDo $
                  mapM_ (handle lock clientaddr) (lines messages)
                  hClose connhdl
                  handle lock clientaddr
-                    "syslogtcpserver.hs: client disconnected"
+                    "syslogtcpserver.hs: client disconnected: " ++ (show clientaddr)
 
           -- Lock the handler before passing data to it.
           handle :: MVar () -> HandlerFunc
@@ -69,4 +68,3 @@ serveLog port handlerfunc = withSocketsDo $
 plainHandler :: HandlerFunc
 plainHandler addr msg =
     putStrLn $ "From " ++ show addr ++ ": " ++ msg
-{-- /snippet all --}
