@@ -31,12 +31,12 @@ def accept_wrapper(sock, timeout_select):
     events = selectors.EVENT_READ | selectors.EVENT_WRITE
     sel.register(conn, events, data=data)
 
-numberOfArguments = 1+4
+numberOfArguments = 1+3
 if len(sys.argv) != numberOfArguments:
-    print("usage:", sys.argv[0], "<host> <port> <timeout_select> <log_file>")
+    print("usage:", sys.argv[0], "<host> <port> <timeout_select>")
     sys.exit(1)
 
-host, port, timeout_select, log_file = sys.argv[1], int(sys.argv[2]), float(sys.argv[3]), sys.argv[4]
+host, port, timeout_select = sys.argv[1], int(sys.argv[2]), float(sys.argv[3])
 
 lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 lsock.bind((host, port))

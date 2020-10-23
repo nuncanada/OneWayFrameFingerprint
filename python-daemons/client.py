@@ -39,12 +39,12 @@ def start_connections(timeout_select):
         sel.register(sock, events, data=data)
         common.register_logger('client', server['name'])
 
-numberOfArguments = 1+2
+numberOfArguments = 1+1
 if len(sys.argv) != numberOfArguments:
-    print("usage:", sys.argv[0], "<timeout_select> <log_file>")
+    print("usage:", sys.argv[0], "<timeout_select>")
     sys.exit(1)
 
-timeout_select, log_file = float(sys.argv[1]), sys.argv[2]
+timeout_select = float(sys.argv[1])
 
 start_connections(timeout_select)
 

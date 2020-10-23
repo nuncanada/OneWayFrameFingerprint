@@ -1,0 +1,22 @@
+12738693647431334
+12738693
+>>>
+flavio@linux:~$ date
+qui out 22 21:46:23 -03 2020
+
+> ping php5-desenv.intranet.stm
+
+Pinging php5-desenv.intranet.stm [172.16.0.6] with 32 bytes of data:
+Reply from 172.16.0.6: bytes=32 time=186ms TTL=62
+Reply from 172.16.0.6: bytes=32 time=195ms TTL=62
+Reply from 172.16.0.6: bytes=32 time=195ms TTL=62
+Reply from 172.16.0.6: bytes=32 time=213ms TTL=62
+
+Ping statistics for 172.16.0.6:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 186ms, Maximum = 213ms, Average = 197ms
+
+197ms
+
+9 últimos números -> nanosegundos
