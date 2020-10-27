@@ -50,10 +50,14 @@ def service_connection(key, mask):
     if mask & selectors.EVENT_READ:
         recv_data = sock.recv(1024)  # Should be ready to read
         if recv_data:
-            decoded_data = recv_data.decode()
-            monotonic_time = time.monotonic_ns()
-            logger.warning(f"RECV {monotonic_time}, {decoded_data}")
-            print(f"RECV {monotonic_time}, {decoded_data}")
+            try:
+                decoded_data = recv_data.decode()
+                monotonic_time = time.monotonic_ns()
+                logger.warning(f"RECV {monotonic_time}, {decoded_data}")
+                print(f"RECV {monotonic_time}, {decoded_data}")
+            except UnicodeDecodeError:
+                text = str(recv_data)
+                print(f"Dados não podem ser traduzidos para UTF-8: {text}")
         if not recv_data:
             logger.warning(f"closing connection TO {sock.getpeername()}")
             sel.unregister(sock)
