@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main (main) where
 
 import Data.List
+import Data.List.Split
 import Data.Map as DM
 import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Char8 as C
 
 import Network.Socket
 import qualified Network.Socket.ByteString as SB
@@ -34,11 +35,14 @@ import Data.Monoid
 import Data.Function
 import Control.Monad
 
+import System.Environment
+
+import qualified Data.ByteString.Lazy as BL
+import Data.Csv
+import qualified Data.Vector as V
+
 timeFormat :: TimeFormat
 timeFormat = "%F"
-
-waitBetweenPings :: Int
-waitBetweenPings = 500 * 1000
 
 logLogger :: TimedFastLogger -> LogStr -> IO ()
 logLogger logger msg = logger (\_ -> msg <> "\n")
@@ -48,7 +52,7 @@ timeRotate fname = LogFileTimedRotate
                (TimedFileLogSpec fname timeFormat sametime compressFile)
                defaultBufSize
    where
-       sametime = (==) --`on` C.takeWhile (/='T')) x)
+       sametime = (==) --`on` B.takeWhile (/='T')) x)
        compressFile fp = void . forkIO $
            callProcess "gzip" [ fp ]
 
@@ -56,6 +60,7 @@ timeRotate fname = LogFileTimedRotate
 --cloudServers :: Map String IPv4
 --cloudServers = fromList([("TRABALHO-FLAVIO",   (read "127.0.0.1" :: IPv4))])
 
+{-
 cloudServers :: Map String IPv4
 cloudServers = fromList([
       ("ashburn-a",    (read "10.150.0.2" :: IPv4)),
@@ -64,29 +69,64 @@ cloudServers = fromList([
       ("saopaulo-a",   (read "10.158.0.2" :: IPv4)),
       ("thedalles-a",  (read "10.138.0.2" :: IPv4))
   ])
+-}
 
-udpPort :: String
-udpPort = "1905"
+serverVectorToMap :: V.Vector (String, String, Int) -> Map String (IPv4, Int)
+serverVectorToMap = V.foldr (
+    \(nome, ipString, porta) m -> DM.insert nome ((read ipString)::IPv4, porta) m
+  ) empty
+
+{-
+readServerFile :: [String] -> Map String (IPv4, Int)
+readServerFile = Data.List.foldr (\s m ->
+    let
+      (nome:ip:porta:_) = (splitWhen (==',') s)
+      n = read nome :: String
+      i = read ip :: IPv4
+      p = read porta :: Int
+    in DM.insert n (i,p) m) empty
+-}
 
 data ServerHandle =
     ServerHandle {slSocket :: Socket,
                   slAddress :: SockAddr} deriving Show
 
-type HandlerFunc = B.ByteString -> SockAddr -> B.ByteString -> IPv4 -> IO ()
+type HandlerFunc = B.ByteString -> SockAddr -> B.ByteString -> String -> IO ()
 
 main :: IO ()
 main = do
-    hostname <- NH.getHostName
-    putStrLn ("hostname: " ++ (show hostname))
-    let logger = timeRotate $ "/home/fezsentido/" <> hostname <> ".log"
-    let hostAddress = cloudServers ! hostname
-    timeCache <- newTimeCache timeFormat
-    (logger', cleanup) <- newTimedFastLogger timeCache logger
-    let log = logLogger logger'
-    putStrLn (show hostAddress)
-    handles <- openSockets cloudServers udpPort
-    _ <- forkIO $ client handles hostAddress
-    server udpPort handles hostAddress log
+    args <- getArgs;
+    progName <- getProgName;
+    hostname <- NH.getHostName;
+    putStrLn $ "args.length: " ++ (show (length args));
+    print args
+    if ((length args) /= 4) then do {
+        putStrLn $ "usage: " ++ progName ++ " <port> <timeBetweenPings> <logDirectory> <serverCsvFile>";
+    } else do
+        putStrLn ("hostname: " ++ (show hostname));
+        let port = read (args !! 0) :: PortNumber;
+        let timeBetweenPings = read (args !! 1) :: Float;
+        let logDirectory = args !! 2;
+        let serverCsvFile = args !! 3;
+        let logger = timeRotate $ logDirectory ++ "/" ++ hostname ++ ".log";
+        let waitBetweenPings = round $ timeBetweenPings * 1000 * 1000;
+
+        csvData <- BL.readFile serverCsvFile
+        case decode NoHeader csvData of
+            Left err -> putStrLn err
+            Right v -> do
+              let cloudServers = serverVectorToMap v;
+              if not (DM.member hostname cloudServers) then do
+                putStrLn $ "hostname not found in " ++ serverCsvFile;
+              else do
+                  let hostAddress = cloudServers ! hostname;
+                  timeCache <- newTimeCache timeFormat;
+                  (logger', cleanup) <- newTimedFastLogger timeCache logger;
+                  let log = logLogger logger';
+                  putStrLn (show hostAddress);
+                  _ <- forkIO $ client cloudServers hostname waitBetweenPings;
+                  server port hostname log;
+
 
 getHostAddress :: SockAddr -> HostAddress
 getHostAddress (SockAddrInet _ hostAddress) = hostAddress
@@ -95,14 +135,12 @@ getHostAddress _ = error "Nao implementado"
 showTimeSpec :: TimeSpec -> String
 showTimeSpec   (TimeSpec  (toInteger -> s) (toInteger -> n)) = (show s) ++ "."  ++ (printf "%09d" n)
 
-openlog :: IPv4                 -- ^ HostAddress
-        -> String               -- ^ Port number or name; 514 is default
-        -> IO ServerHandle      -- ^ Handle to use for logging
-openlog hostAddress port =
+openlog :: (IPv4, Int) -> IO ServerHandle
+openlog hostAddress =
     do -- Look up the hostname and port.  Either raises an exception
        -- or returns a nonempty list.  First element in that list
        -- is supposed to be the best option.
-       addrinfos <- getAddrInfo Nothing (Just (show hostAddress)) (Just port)
+       addrinfos <- getAddrInfo Nothing (Just (show $ fst hostAddress)) (Just $ show (snd hostAddress))
        let serveraddr = head addrinfos
 
        -- Establish a socket for communication
@@ -111,24 +149,21 @@ openlog hostAddress port =
        -- Save off the socket, and server address in a handle
        return $ ServerHandle sock (addrAddress serveraddr)
 
-openSockets :: Map String IPv4 -> String -> IO [ServerHandle]
-openSockets servers port =
-    mapM (\x -> openlog x port) (elems servers)
+openSockets :: Map String (IPv4, Int) -> IO [ServerHandle]
+openSockets servers =
+    mapM (\address -> openlog address) (elems servers)
 
 
-server :: String -> [ServerHandle] -> IPv4 -> (LogStr -> IO ()) -> IO ()
-server port handles localAddress log = serveLog port localAddress (plainHandler handles log)
+server :: PortNumber -> HostName -> (LogStr -> IO ()) -> IO ()
+server port hostname log = serveLog port hostname (plainHandler log)
 
-serveLog :: String              -- ^ Port number or name; 514 is default
-         -> IPv4
-         -> HandlerFunc         -- ^ Function to handle incoming messages
-         -> IO ()
-serveLog port localAddress handlerfunc = withSocketsDo $
+serveLog :: PortNumber -> HostName -> HandlerFunc -> IO ()
+serveLog port hostname handlerfunc = withSocketsDo $
     do -- Look up the port.  Either raises an exception or returns
        -- a nonempty list.
        addrinfos <- getAddrInfo
                     (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                    Nothing (Just port)
+                    Nothing (Just $ show port)
        let serveraddr = head addrinfos
 
        -- Create a socket
@@ -146,7 +181,7 @@ serveLog port localAddress handlerfunc = withSocketsDo $
                  (msg, addr) <- SB.recvFrom sock 1024
                  -- Handle it
                  let command = B.take 4 msg
-                 handlerfunc command addr msg localAddress
+                 handlerfunc command addr msg hostname
                  -- And process more messages
                  procMessages sock
 
@@ -173,41 +208,34 @@ sendMessage response address handles =
         Nothing -> trace ((show handles) ++ "-" ++ (show address)) $ trace (show hostHandle) $ trace (show (getHostAddress address)) $ error "Unable to find handle"
         Just handle -> (sendMessage' handle response)
 
-plainHandler :: [ServerHandle] -> (LogStr -> IO ()) -> HandlerFunc
-plainHandler handles _ "PING" address msg localAddress = do
+plainHandler :: (LogStr -> IO ()) -> HandlerFunc
+plainHandler log "PING" _ msg hostname = do
       monotonicTimeCounter <- getOsMonotonicCounter
       currentTime <- getCurrentTime
-      let responseMessage = "PONG " ++ (show currentTime) ++ "," ++ (show localAddress) ++ "," ++ (showTimeSpec monotonicTimeCounter) ++ "," ++ (C.unpack msg)
-      sendMessage responseMessage address handles
-      --This was for debugging packet loss. Optmizing for smaller log files now.
-      --log responseMessage
+      log $ toLogStr ("RECV " ++ (show currentTime) ++ "," ++ hostname ++ "," ++ (showTimeSpec monotonicTimeCounter) ++ "," ++ (B.unpack msg))
       return ()
-plainHandler _ log "PONG" _ msg localAddress = do
-      monotonicTimeCounter <- getOsMonotonicCounter
-      currentTime <- getCurrentTime
-      log $ toLogStr ("RECV " ++ (show currentTime) ++ "," ++ (show localAddress) ++ "," ++ (showTimeSpec monotonicTimeCounter) ++ "," ++ (C.unpack msg))
-      return ()
-plainHandler _ log command address msg localAddress = do
-      log $ toLogStr ("Comando desconhecido: " ++ (B.unpack command) ++ " - msg: " ++ (B.unpack msg) ++ " - localAddress: " ++ (show localAddress) ++ " - address: " ++ (show address))
+plainHandler log command address msg hostname = do
+      log $ toLogStr ("Comando desconhecido: " ++ (B.unpack command) ++ " - msg: " ++ (B.unpack msg) ++ " - hostname: " ++ hostname ++ " - address: " ++ (show address))
       return ()
 
-client :: [ServerHandle] -> IPv4 -> IO ()
-client handles localAddress =
+client :: Map String (IPv4, Int) -> String -> Int -> IO ()
+client cloudServers hostname waitBetweenPings =
   do
-    sendTimeLoop handles 0 localAddress
+    handles <- openSockets cloudServers;
+    sendTimeLoop handles 0 hostname waitBetweenPings
 --    mapM_ closelog handles
 
-sendTimeLoop :: [ServerHandle] -> Integer -> IPv4 -> IO ()
-sendTimeLoop handles index localAddress = do
+sendTimeLoop :: [ServerHandle] -> Integer -> String -> Int -> IO ()
+sendTimeLoop handles index hostname waitBetweenPings = do
   threadDelay waitBetweenPings
-  mapM_ (\x -> sendTime x index localAddress) handles
-  sendTimeLoop handles (index+1) localAddress
+  mapM_ (\x -> sendTime x index hostname) handles
+  sendTimeLoop handles (index+1) hostname waitBetweenPings
 
-sendmsg :: Show a => a -> IPv4 -> IO [Char]
-sendmsg index localAddress = do
+sendmsg :: Show a => a -> String -> IO [Char]
+sendmsg index hostname = do
   monotonicTimeCounter <- getOsMonotonicCounter
   currentTime <- getCurrentTime
-  return $ "PING " ++ (show currentTime) ++ "," ++ (show index) ++ "," ++ (show localAddress) ++ "," ++ (showTimeSpec monotonicTimeCounter)
+  return $ "PING " ++ (show currentTime) ++ "," ++ (show index) ++ "," ++ hostname ++ "," ++ (showTimeSpec monotonicTimeCounter)
 
 sendstr :: String -> ServerHandle -> IO ()
 sendstr []   _      = return ()
@@ -215,9 +243,9 @@ sendstr omsg handle = do
   sent <- SB.sendTo (slSocket handle) (B.pack omsg) (slAddress handle)
   sendstr (genericDrop sent omsg) handle
 
-sendTime :: ServerHandle -> Integer -> IPv4 -> IO ()
-sendTime handle index localAddress = do
-  omsg <- sendmsg index localAddress
+sendTime :: ServerHandle -> Integer -> String -> IO ()
+sendTime handle index hostname = do
+  omsg <- sendmsg index hostname
   sendstr omsg handle
 
 closelog :: ServerHandle -> IO ()
